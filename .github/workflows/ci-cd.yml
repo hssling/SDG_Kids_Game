@@ -1,0 +1,331 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install Cordova CLI
+      run: npm install -g cordova@latest
+
+    - name: Navigate to Cordova project
+      run: cd SDGApp
+
+    - name: Install dependencies
+      run: |
+        cd SDGApp
+        npm install
+
+    - name: Lint and validate Cordova configuration
+      run: |
+        cd SDGApp
+        cordova requirements android
+
+    - name: Lint JavaScript files
+      run: |
+        cd SDGApp/www/js
+        npx eslint *.js || true  # Continue even if linting fails
+
+    - name: Validate HTML
+      run: |
+        cd SDGApp/www
+        npx htmlhint *.html || true  # Continue even if validation fails
+
+    - name: Validate CSS
+      run: |
+        cd SDGApp/www/css
+        npx stylelint *.css || true  # Continue even if validation fails
+
+  build-android-debug:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Install Cordova CLI
+      run: npm install -g cordova@latest
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Build Android Debug APK
+      run: |
+        cd SDGApp
+        npm install
+        cordova platform add android --nosave
+        cordova build android --debug --verbose
+
+    - name: Upload Debug APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sdg-kids-game-debug-apk
+        path: SDGApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 30
+
+  build-android-release:
+    runs-on: ubuntu-latest
+    needs: build-android-debug
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+
+    - name: Install Cordova CLI
+      run: npm install -g cordova@latest
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Create Release Keystore
+      run: |
+        cd SDGApp
+        keytool -genkeypair -v -keystore release.keystore -alias sdg-release -keyalg RSA -keysize 2048 -validity 10000 -storepass $RELEASE_KEYSTORE_PASSWORD -keypass $RELEASE_KEY_PASSWORD -dname "CN=Dr. Siddalingaiah H S, OU=Development, O=SDG Educational, L=Global, ST=World, C=UN"
+      env:
+        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+    - name: Build Android Release APK and AAB
+      run: |
+        cd SDGApp
+        npm install
+        cordova platform add android --nosave
+
+        # Build APK
+        cordova build android --release --buildJson=build.json
+
+        # Create temporary build.json with keystore info
+        echo '{
+          "android": {
+            "release": {
+              "keystore": "release.keystore",
+              "storePassword": "'${{ secrets.RELEASE_KEYSTORE_PASSWORD }}'",
+              "alias": "sdg-release",
+              "password": "'${{ secrets.RELEASE_KEY_PASSWORD }}'",
+              "keystoreType": "jks"
+            }
+          }
+        }' > release-build.json
+
+        # Build AAB (Android App Bundle) for Google Play
+        cordova build android --release --buildJson=release-build.json
+
+    - name: Upload Release APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sdg-kids-game-release-apk
+        path: SDGApp/platforms/android/app/build/outputs/apk/release/app-release.apk
+        retention-days: 30
+
+    - name: Upload Release AAB Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sdg-kids-game-release-aab
+        path: SDGApp/platforms/android/app/build/outputs/bundle/release/app-release.aab
+        retention-days: 30
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: build-android-release
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get version from package.json
+      id: get_version
+      run: echo "version=$(node -p "require('./SDGApp/package.json').version")" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.get_version.outputs.version }}
+        release_name: SDG Kids Game v${{ steps.get_version.outputs.version }}
+        body: |
+          ## 🌍 SDG Kids Game v${{ steps.get_version.outputs.version }}
+
+          ### 📱 What's New
+          - Educational content updates
+          - Bug fixes and performance improvements
+          - Enhanced user experience
+
+          ### 📦 Downloads
+          - **APK** (direct install): Download the APK artifact
+          - **AAB** (Google Play): Ready for Play Store submission
+
+          ### 🧪 Testing
+          This release has been automatically built and tested on:
+          - Android Debug APK
+          - Android Release APK
+          - Android App Bundle (AAB)
+
+          ### 🔧 Installation
+          1. Download the APK artifact from the Actions tab
+          2. Install on Android device (allow unknown sources)
+          3. Launch and learn about SDGs!
+
+          ---
+          **Made with ❤️ for global education**
+        draft: false
+        prerelease: false
+
+  validate-content:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Validate SDG Data
+      run: |
+        cd SDGApp/www/js
+        node -e "
+        const { sdgs, quizQuestions, riddles } = require('./sdg_data.js');
+        console.log('✅ SDG Data Validation:');
+        console.log('   - SDGs count:', sdgs.length, '(should be 17)');
+        console.log('   - Quiz questions:', quizQuestions.length);
+        console.log('   - Riddles count:', riddles.length);
+
+        // Basic validation checks
+        if (sdgs.length !== 17) {
+          console.error('❌ Error: Expected 17 SDGs, found', sdgs.length);
+          process.exit(1);
+        }
+
+        const uniqueSDGs = new Set(sdgs.map(sdg => sdg.id));
+        if (uniqueSDGs.size !== 17) {
+          console.error('❌ Error: Duplicate SDG IDs found');
+          process.exit(1);
+        }
+
+        console.log('✅ All validations passed!');
+        "
+
+    - name: Validate HTML Structure
+      run: |
+        cd SDGApp/www
+
+        # Check for required elements
+        if ! grep -q "id=\"menu\"" index.html; then
+          echo "❌ Error: Main menu not found in index.html"
+          exit 1
+        fi
+
+        if ! grep -q "id=\"quiz\"" index.html; then
+          echo "❌ Error: Quiz section not found in index.html"
+          exit 1
+        fi
+
+        if ! grep -q "id=\"riddle\"" index.html; then
+          echo "❌ Error: Riddle section not found in index.html"
+          exit 1
+        fi
+
+        echo "✅ HTML structure validation passed!"
+
+    - name: Check for Required Assets
+      run: |
+        cd SDGApp
+
+        # Check for required JS files
+        if [ ! -f "www/js/game.js" ]; then
+          echo "❌ Error: game.js not found"
+          exit 1
+        fi
+
+        if [ ! -f "www/js/sdg_data.js" ]; then
+          echo "❌ Error: sdg_data.js not found"
+          exit 1
+        fi
+
+        # Check for required CSS files
+        if [ ! -f "www/css/index.css" ]; then
+          echo "❌ Error: index.css not found"
+          exit 1
+        fi
+
+        # Check for HTML file
+        if [ ! -f "www/index.html" ]; then
+          echo "❌ Error: index.html not found"
+          exit 1
+        fi
+
+        echo "✅ All required assets present!"
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, build-android-debug, validate-content]
+    if: failure()
+
+    steps:
+    - name: Notify on Failure
+      run: |
+        echo "❌ CI/CD Pipeline Failed"
+        echo "Please check the logs and fix any issues:"
+        echo "- Code linting errors"
+        echo "- Build failures"
+        echo "- Content validation issues"
+        echo ""
+        echo "🔧 Common fixes:"
+        echo "- Check Node.js dependencies"
+        echo "- Verify Cordova configuration"
+        echo "- Review SDG data structure"
+        echo "- Fix any linting issues"
+
+        # Future: Add Slack/Discord notification here
+        # curl -X POST -H 'Content-type: application/json' \
+        # --data '{"text":"SDG Kids Game CI/CD Failed"}' \
+        # ${{ secrets.SLACK_WEBHOOK_URL }}

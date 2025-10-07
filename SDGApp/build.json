@@ -1,0 +1,10 @@
+{
+  "android": {
+    "release": {
+      "keystore": "sdg-game.keystore",
+      "storePassword": "mypassword",
+      "alias": "sdg-alias",
+      "password": "mypassword"
+    }
+  }
+}

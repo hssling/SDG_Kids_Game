@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
+    <title>SDG Kids Game</title>
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+    <!-- Main Menu -->
+    <div id="menu" class="screen">
+        <h1>SDG Kids Game</h1>
+        <p>Learn about Sustainable Development Goals!</p>
+        <button onclick="showScreen('quiz')">Play Quiz</button>
+        <button onclick="showScreen('riddle')">Solve Riddles</button>
+        <button onclick="showScreen('learn')">Learn SDGs</button>
+        <p>Score: <span id="totalScore">0</span></p>
+        <button onclick="showScreen('score')">View Total Points</button>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quiz" class="screen hidden">
+        <h2>SDG Quiz</h2>
+        <div id="quizQuestion"></div>
+        <div id="quizOptions"></div>
+        <button onclick="showScreen('menu')">Back to Menu</button>
+    </div>
+
+    <!-- Riddle Screen -->
+    <div id="riddle" class="screen hidden">
+        <h2>SDG Riddle</h2>
+        <div id="riddleQuestion"></div>
+        <input type="text" id="riddleAnswer" placeholder="Your answer">
+        <button onclick="checkRiddleAnswer()">Submit</button>
+        <button onclick="showScreen('menu')">Back to Menu</button>
+    </div>
+
+    <!-- Learn Screen -->
+    <div id="learn" class="screen hidden">
+        <h2>Learn About SDGs</h2>
+        <div id="sdgInfo"></div>
+        <div id="funFact"></div>
+        <button id="nextSDG" onclick="nextSDG()">Next SDG</button>
+        <button onclick="showScreen('menu')">Back to Menu</button>
+    </div>
+
+    <!-- Score Screen -->
+    <div id="score" class="screen hidden">
+        <h2>Your Total Points!</h2>
+        <div id="scoreDisplay"></div>
+        <button onclick="showScreen('menu')">Back to Menu</button>
+    </div>
+
+    <!-- Riddle Hint Screen -->
+    <div id="hint" class="screen hidden">
+        <h2>Need a Hint?</h2>
+        <div id="hintText"></div>
+        <button onclick="showScreen('riddle')">Try Again</button>
+    </div>
+
+    <script src="js/sdg_data.js"></script>
+    <script src="js/game.js"></script>
+    <script src="cordova.js"></script>
+</body>
+</html>
