@@ -1,11 +1,26 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="com.example.sdggame" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>SDG Kids Game</name>
-    <description>Sample Apache Cordova App</description>
-    <author email="dev@cordova.apache.org" href="https://cordova.apache.org">
-        Apache Cordova Team
+    <description>An educational mobile game teaching children about United Nations Sustainable Development Goals</description>
+    <author email="hs2275@srmist.edu.in" href="https://github.com/hssling">
+        Dr. Siddalingaiah H S
     </author>
+
     <content src="index.html" />
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
+
+    <!-- Icons for different platforms -->
+    <icon src="www/icons/icon_512x512.png" platform="android" density="xxxhdpi" />
+    <icon src="www/icons/icon_512x512.png" platform="ios" width="512" height="512" />
+
+    <!-- Splash screens can be added later -->
+    <!-- <splash src="www/screens/outdoor.jpg" platform="android" orientation="portrait" /> -->
+
+    <!-- Additional metadata for app stores -->
+    <platform name="android">
+        <preference name="android-targetSdkVersion" value="33" />
+        <preference name="android-minSdkVersion" value="21" />
+    </platform>
+
 </widget>
